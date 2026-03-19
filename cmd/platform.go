@@ -147,6 +147,7 @@ func createGithubClient(flag *flag.FlagSet, verifyFlags bool, readOnly bool) (mu
 	skipMissingRepos, _ := flag.GetBool("skip-missing-repos")
 
 	if verifyFlags && len(orgs) == 0 && len(users) == 0 && len(repos) == 0 && repoSearch == "" && codeSearch == "" {
+		return nil, errors.New("no organization, user, repo, repo-search or code-search set")
 	}
 
 	token, err := getToken(flag)
