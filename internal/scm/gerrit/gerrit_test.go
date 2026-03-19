@@ -664,3 +664,47 @@ func TestGetRepositoriesWithInactiveRepoInList(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, repos, 0) // Should not return inactive repos even if in the list
 }
+
+func TestGetRepositoriesSkipMissingRepos(t *testing.T) {
+	// With SkipMissingRepos disabled (default), a missing repo should cause an error
+	t.Run("disabled", func(t *testing.T) {
+		g := &Gerrit{
+			client: goGerritClientMock{},
+			config: Config{
+				BaseURL:  "https://gerrit.com",
+				Username: "admin",
+				Token:    "token123",
+				RepoListing: RepositoryListing{
+					Repositories:     []string{"repo-active", "nonexistent-repo"},
+					SkipMissingRepos: false,
+				},
+			},
+		}
+
+		repos, err := g.GetRepositories(context.Background())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get information about nonexistent-repo")
+		require.Nil(t, repos)
+	})
+
+	// With SkipMissingRepos enabled, missing repos should be skipped
+	t.Run("enabled", func(t *testing.T) {
+		g := &Gerrit{
+			client: goGerritClientMock{},
+			config: Config{
+				BaseURL:  "https://gerrit.com",
+				Username: "admin",
+				Token:    "token123",
+				RepoListing: RepositoryListing{
+					Repositories:     []string{"repo-active", "nonexistent-repo"},
+					SkipMissingRepos: true,
+				},
+			},
+		}
+
+		repos, err := g.GetRepositories(context.Background())
+		require.NoError(t, err)
+		require.Len(t, repos, 1)
+		assert.Equal(t, "repo-active", repos[0].FullName())
+	})
+}

@@ -66,11 +66,12 @@ type Gitea struct {
 
 // RepositoryListing contains information about which repositories that should be fetched
 type RepositoryListing struct {
-	Organizations []string
-	Users         []string
-	Repositories  []RepositoryReference
-	Topics        []string
-	SkipForks     bool
+	Organizations    []string
+	Users            []string
+	Repositories     []RepositoryReference
+	Topics           []string
+	SkipForks        bool
+	SkipMissingRepos bool
 }
 
 // RepositoryReference contains information to be able to reference a repository
@@ -157,9 +158,13 @@ func (g *Gitea) getRepositories(ctx context.Context) ([]*gitea.Repository, error
 		allRepos = append(allRepos, repos...)
 	}
 
-	for _, repo := range g.Repositories {
-		repo, err := g.getRepository(ctx, repo)
+	for _, repoRef := range g.Repositories {
+		repo, err := g.getRepository(ctx, repoRef)
 		if err != nil {
+			if g.SkipMissingRepos {
+				log.Warnf("Skipping %s: %v", repoRef.String(), err)
+				continue
+			}
 			return nil, err
 		}
 		allRepos = append(allRepos, repo)

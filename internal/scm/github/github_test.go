@@ -381,6 +381,78 @@ func Test_GetRepositories(t *testing.T) {
 	}
 }
 
+func Test_SkipMissingRepos(t *testing.T) {
+	transport := testTransport{
+		pathBodies: map[string]string{
+			"/repos/test-org/test1": `{
+				"id": 1,
+				"name": "test1",
+				"full_name": "test-org/test1",
+				"private": false,
+				"owner": {
+					"login": "test-org",
+					"type": "Organization",
+					"site_admin": false
+				},
+				"html_url": "https://github.com/test-org/test1",
+				"fork": false,
+				"archived": false,
+				"disabled": false,
+				"default_branch": "master",
+				"permissions": {
+					"admin": true,
+					"push": true,
+					"pull": true
+				},
+				"created_at": "2020-01-01T16:49:16Z"
+			}`,
+		},
+	}
+
+	// With SkipMissingRepos disabled, a missing repo should cause an error
+	t.Run("disabled", func(t *testing.T) {
+		gh, err := github.New(github.Config{
+			TransportMiddleware: transport.Wrapper,
+			RepoListing: github.RepositoryListing{
+				Repositories: []github.RepositoryReference{
+					{OwnerName: "test-org", Name: "test1"},
+					{OwnerName: "test-org", Name: "nonexistent"},
+				},
+				SkipMissingRepos: false,
+			},
+			MergeTypes: []scm.MergeType{scm.MergeTypeMerge},
+		})
+		require.NoError(t, err)
+
+		repos, err := gh.GetRepositories(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "could not get information about test-org/nonexistent")
+		assert.Nil(t, repos)
+	})
+
+	// With SkipMissingRepos enabled, missing repos should be skipped
+	t.Run("enabled", func(t *testing.T) {
+		gh, err := github.New(github.Config{
+			TransportMiddleware: transport.Wrapper,
+			RepoListing: github.RepositoryListing{
+				Repositories: []github.RepositoryReference{
+					{OwnerName: "test-org", Name: "test1"},
+					{OwnerName: "test-org", Name: "nonexistent"},
+				},
+				SkipMissingRepos: true,
+			},
+			MergeTypes: []scm.MergeType{scm.MergeTypeMerge},
+		})
+		require.NoError(t, err)
+
+		repos, err := gh.GetRepositories(context.Background())
+		assert.NoError(t, err)
+		if assert.Len(t, repos, 1) {
+			assert.Equal(t, "test-org/test1", repos[0].FullName())
+		}
+	})
+}
+
 func Test_SearchIncomplete(t *testing.T) {
 	transport := testTransport{
 		pathBodies: map[string]string{

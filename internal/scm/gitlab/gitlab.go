@@ -52,11 +52,12 @@ type Gitlab struct {
 
 // RepositoryListing contains information about which repositories that should be fetched
 type RepositoryListing struct {
-	Groups    []string
-	Users     []string
-	Projects  []ProjectReference
-	Topics    []string
-	SkipForks bool
+	Groups           []string
+	Users            []string
+	Projects         []ProjectReference
+	Topics           []string
+	SkipForks        bool
+	SkipMissingRepos bool
 }
 
 // Config includes extra config parameters for the GitLab client
@@ -136,9 +137,13 @@ func (g *Gitlab) getProjects(ctx context.Context) ([]*gitlab.Project, error) {
 		allProjects = append(allProjects, projects...)
 	}
 
-	for _, project := range g.Projects {
-		project, err := g.getProject(ctx, project)
+	for _, projRef := range g.Projects {
+		project, err := g.getProject(ctx, projRef)
 		if err != nil {
+			if g.SkipMissingRepos {
+				log.Warnf("Skipping %s: %v", projRef.String(), err)
+				continue
+			}
 			return nil, err
 		}
 

@@ -115,6 +115,7 @@ type RepositoryListing struct {
 	CodeSearch       string
 	Topics           []string
 	SkipForks        bool
+	SkipMissingRepos bool
 }
 
 // RepositoryReference contains information to be able to reference a repository
@@ -213,6 +214,10 @@ func (g *Github) getRepositories(ctx context.Context) ([]*github.Repository, err
 	for _, repoRef := range g.Repositories {
 		repo, err := g.getRepository(ctx, repoRef)
 		if err != nil {
+			if g.SkipMissingRepos {
+				log.Warnf("Skipping %s: %v", repoRef.String(), err)
+				continue
+			}
 			return nil, errors.Wrapf(err, "could not get information about %s", repoRef.String())
 		}
 		allRepos = append(allRepos, repo)
@@ -402,6 +407,10 @@ func (g *Github) getAllRepositories(ctx context.Context, repoRefs []RepositoryRe
 	for _, ref := range repoRefs {
 		r, err := g.getRepository(ctx, ref)
 		if err != nil {
+			if g.SkipMissingRepos {
+				log.Warnf("Skipping %s: %v", ref.String(), err)
+				continue
+			}
 			return nil, err
 		}
 		repos = append(repos, r)
