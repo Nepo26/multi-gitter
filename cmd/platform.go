@@ -43,6 +43,7 @@ func configurePlatform(cmd *cobra.Command) {
 	flags.BoolP("include-subgroups", "", false, "Include GitLab subgroups when using the --group flag.")
 	flags.BoolP("ssh-auth", "", false, `Use SSH cloning URL instead of HTTPS + token. This requires that a setup with ssh keys that have access to all repos and that the server is already in known_hosts.`)
 	flags.BoolP("skip-forks", "", false, `Skip repositories which are forks.`)
+	flags.BoolP("skip-missing-repos", "", false, `Skip repositories that cannot be fetched (e.g. 404, 403) instead of failing the entire run.`)
 
 	flags.StringP("platform", "p", "github", "The platform that is used. Available values: github, gitlab, gitea, bitbucket_server, bitbucket_cloud, gerrit. Note: bitbucket_cloud is in Beta")
 	_ = cmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -143,9 +144,9 @@ func createGithubClient(flag *flag.FlagSet, verifyFlags bool, readOnly bool) (mu
 	forkOwner, _ := flag.GetString("fork-owner")
 	sshAuth, _ := flag.GetBool("ssh-auth")
 	skipForks, _ := flag.GetBool("skip-forks")
+	skipMissingRepos, _ := flag.GetBool("skip-missing-repos")
 
 	if verifyFlags && len(orgs) == 0 && len(users) == 0 && len(repos) == 0 && repoSearch == "" && codeSearch == "" {
-		return nil, errors.New("no organization, user, repo, repo-search or code-search set")
 	}
 
 	token, err := getToken(flag)
@@ -193,6 +194,7 @@ func createGithubClient(flag *flag.FlagSet, verifyFlags bool, readOnly bool) (mu
 			RepositorySearch: repoSearch,
 			Topics:           topics,
 			SkipForks:        skipForks,
+			SkipMissingRepos: skipMissingRepos,
 		},
 		MergeTypes:       mergeTypes,
 		ForkMode:         forkMode,
@@ -217,6 +219,7 @@ func createGitlabClient(flag *flag.FlagSet, verifyFlags bool) (multigitter.Versi
 	includeSubgroups, _ := flag.GetBool("include-subgroups")
 	sshAuth, _ := flag.GetBool("ssh-auth")
 	skipForks, _ := flag.GetBool("skip-forks")
+	skipMissingRepos, _ := flag.GetBool("skip-missing-repos")
 
 	if verifyFlags && len(groups) == 0 && len(users) == 0 && len(projects) == 0 {
 		return nil, errors.New("no group user or project set")
@@ -242,11 +245,12 @@ func createGitlabClient(flag *flag.FlagSet, verifyFlags bool) (multigitter.Versi
 	}
 
 	vc, err := gitlab.New(token, gitBaseURL, gitlab.RepositoryListing{
-		Groups:    groups,
-		Users:     users,
-		Projects:  projRefs,
-		Topics:    topics,
-		SkipForks: skipForks,
+		Groups:           groups,
+		Users:            users,
+		Projects:         projRefs,
+		Topics:           topics,
+		SkipForks:        skipForks,
+		SkipMissingRepos: skipMissingRepos,
 	}, gitlab.Config{
 		IncludeSubgroups: includeSubgroups,
 		SSHAuth:          sshAuth,
@@ -266,6 +270,7 @@ func createGiteaClient(flag *flag.FlagSet, verifyFlags bool) (multigitter.Versio
 	topics, _ := flag.GetStringSlice("topic")
 	sshAuth, _ := flag.GetBool("ssh-auth")
 	skipForks, _ := flag.GetBool("skip-forks")
+	skipMissingRepos, _ := flag.GetBool("skip-missing-repos")
 
 	if verifyFlags && len(orgs) == 0 && len(users) == 0 && len(repos) == 0 {
 		return nil, errors.New("no organization, user or repository set")
@@ -300,11 +305,12 @@ func createGiteaClient(flag *flag.FlagSet, verifyFlags bool) (multigitter.Versio
 	}
 
 	vc, err := gitea.New(token, giteaBaseURL, gitea.RepositoryListing{
-		Organizations: orgs,
-		Users:         users,
-		Repositories:  repoRefs,
-		Topics:        topics,
-		SkipForks:     skipForks,
+		Organizations:    orgs,
+		Users:            users,
+		Repositories:     repoRefs,
+		Topics:           topics,
+		SkipForks:        skipForks,
+		SkipMissingRepos: skipMissingRepos,
 	}, mergeTypes, sshAuth)
 	if err != nil {
 		return nil, err
@@ -408,6 +414,7 @@ func createGerritClient(flag *flag.FlagSet, verifyFlags bool) (multigitter.Versi
 
 	repoRefs, _ := flag.GetStringSlice("repo")
 	repoSearch, _ := flag.GetString("repo-search")
+	skipMissingRepos, _ := flag.GetBool("skip-missing-repos")
 
 	if verifyFlags && len(repoRefs) > 0 && repoSearch != "" {
 		return nil, errors.New("repo and repoSearch can't be defined both")
@@ -423,8 +430,9 @@ func createGerritClient(flag *flag.FlagSet, verifyFlags bool) (multigitter.Versi
 		Token:    token,
 		BaseURL:  gerritBaseURL,
 		RepoListing: gerrit.RepositoryListing{
-			Repositories: repoRefs,
-			RepoSearch:   repoSearch,
+			Repositories:     repoRefs,
+			RepoSearch:       repoSearch,
+			SkipMissingRepos: skipMissingRepos,
 		}})
 	return vc, err
 }

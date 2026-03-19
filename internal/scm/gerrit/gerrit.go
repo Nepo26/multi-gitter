@@ -17,6 +17,7 @@ import (
 	internalHTTP "github.com/lindell/multi-gitter/internal/http"
 	"github.com/lindell/multi-gitter/internal/scm"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const FooterBranch = "MultiGitter-Branch"
@@ -39,8 +40,9 @@ type Config struct {
 
 // RepositoryListing contains information about which repositories that should be fetched
 type RepositoryListing struct {
-	Repositories []string
-	RepoSearch   string
+	Repositories     []string
+	RepoSearch       string
+	SkipMissingRepos bool
 }
 
 func New(config Config) (*Gerrit, error) {
@@ -96,6 +98,10 @@ func (g Gerrit) getSpecificRepositories(ctx context.Context, projectNames []stri
 	for _, projectName := range projectNames {
 		project, _, err := g.client.GetProject(ctx, projectName)
 		if err != nil {
+			if g.config.RepoListing.SkipMissingRepos {
+				log.Warnf("Skipping %s: %v", projectName, err)
+				continue
+			}
 			return nil, errors.Wrapf(err, "could not get information about %s", projectName)
 		}
 
